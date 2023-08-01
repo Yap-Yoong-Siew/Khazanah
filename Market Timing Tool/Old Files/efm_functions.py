@@ -72,7 +72,7 @@ def plot_sector_weights(sector_weights_df, efm_dict, output_path):
         plt.title(f'{efm_dict[efm]} Sector Weights over time')
         plt.xlabel('Effective Date')
         plt.ylabel('Sector Weight')
-        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3) 
         
         # save plot as a jpg image in output directory
         plot_title = f'Sector_weights_over_time_for_{efm_dict[efm]}.jpg'
@@ -100,6 +100,33 @@ def plot_sector_weights(sector_weights_df, efm_dict, output_path):
     
         # df_filtered_dict[account] = df_filtered
     # return df_filtered_dict
+
+def plot_sector_weights_with_regimes(sector_weights_df, efm_dict, additional_df, colors, output_path):
+    df_filtered_dict = {}
+    
+    for efm in efm_dict.keys():
+        df_filtered = sector_weights_df.loc[(sector_weights_df['Account Code'] == efm)]
+        print(df_filtered)
+        # df_filtered['Effective Date'] = pd.to_datetime(df_filtered['Effective Date'])
+        # df_filtered.set_index('Effective Date', inplace=True)
+        df_filtered.groupby('Sector')['Sector Weight'].plot(legend=True, figsize=(14, 6))
+
+        for i in range(len(additional_df) - 1):
+            start = additional_df.index[i]
+            end = additional_df.index[i + 1]
+            plt.axvspan(start, end, color=colors[additional_df['Regime'].iloc[i]], alpha=0.5)
+
+        plt.title(f'{efm_dict[efm]} Sector Weights over time')
+        plt.xlabel('Effective Date')
+        plt.ylabel('Sector Weight')
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+        
+        # save plot as a jpg image in output directory
+        plot_title = f'Sector_weights_over_time_for_{efm_dict[efm]}.jpg'
+        plt.savefig(os.path.join(output_path, plot_title), dpi=300, bbox_inches='tight')
+        plt.show()
+
+
 
 def plot_industry_group_weights(sector_weights_df, efm_dict, output_path):
     
@@ -248,74 +275,74 @@ def holdings_make_dict(holdings):
             
             
     return holdings_dict
-# def top_holdings_changes(top_holdings_dict):
+def top_holdings_changes(top_holdings_dict):
     
-#     top_holdings_changes_dict = {}
+    top_holdings_changes_dict = {}
     
-#     for account in top_holdings_dict.keys():
+    for account in top_holdings_dict.keys():
 
-#         # Obtain list of dates and sort in descending order
-#         dates = list(top_holdings_dict[account].keys())
-#         dates.sort(reverse=True)
+        # Obtain list of dates and sort in descending order
+        dates = list(top_holdings_dict[account].keys())
+        dates.sort(reverse=True)
 
-#         # Find latest and second last dates
-#         latest_date = dates[0]
-#         second_last_date = dates[1]
+        # Find latest and second last dates
+        latest_date = dates[0]
+        second_last_date = dates[1]
 
-#         # Obtain the DataFrames for the two dates
-#         df_latest = top_holdings_dict[account][latest_date]
-#         df_second_last = top_holdings_dict[account][second_last_date]
+        # Obtain the DataFrames for the two dates
+        df_latest = top_holdings_dict[account][latest_date]
+        df_second_last = top_holdings_dict[account][second_last_date]
 
-#         # Subtract the two DataFrames
-#         df_diff = df_latest - df_second_last
+        # Subtract the two DataFrames
+        df_diff = df_latest - df_second_last
         
-#         top_holdings_changes_dict[account] = df_diff
+        top_holdings_changes_dict[account] = df_diff
 
         
-#     return top_holdings_changes_dict
+    return top_holdings_changes_dict
             
-# def holdings_changes(holdings, change_windows):
+def holdings_changes(holdings, change_windows):
 
-#     holdings_by_group_dict = {}
-#     for acct, acct_group in holdings.groupby('Account Code'):
-#         holdings_by_group_dict[acct] = {}
-#         for date, date_group in acct_group.groupby(level=0):
-#             date_string = date.strftime('%Y-%m-%d')
-#             df = date_group[['Ticker_x', 'Quantity', 'Market Value']]
-#             df = df.rename(columns={'Ticker_x': 'Ticker'})
-#             holdings_by_group_dict[acct][date_string] = df
+    holdings_by_group_dict = {}
+    for acct, acct_group in holdings.groupby('Account Code'):
+        holdings_by_group_dict[acct] = {}
+        for date, date_group in acct_group.groupby(level=0):
+            date_string = date.strftime('%Y-%m-%d')
+            df = date_group[['Ticker_x', 'Quantity', 'Market Value']]
+            df = df.rename(columns={'Ticker_x': 'Ticker'})
+            holdings_by_group_dict[acct][date_string] = df
     
-#     holdings_changes_dict = {}
-#     for account in holdings_by_group_dict.keys():
-#         # Obtain list of dates and sort in descending order
-#         dates = list(holdings_by_group_dict[account].keys())
-#         dates.sort(reverse=True)
+    holdings_changes_dict = {}
+    for account in holdings_by_group_dict.keys():
+        # Obtain list of dates and sort in descending order
+        dates = list(holdings_by_group_dict[account].keys())
+        dates.sort(reverse=True)
         
-#         df_diff_dict = {}
-#         for n in change_windows:
+        df_diff_dict = {}
+        for n in change_windows:
             
-#             # Find latest and second last dates
-#             d2 = dates[0]
-#             d1 = dates[n]
+            # Find latest and second last dates
+            d2 = dates[0]
+            d1 = dates[n]
 
-#             # Obtain the DataFrames for the two dates
-#             df2 = holdings_by_group_dict[account][d2].reset_index().drop(columns='Effective Date')
-#             df1 = holdings_by_group_dict[account][d1].reset_index().drop(columns='Effective Date')
-#             df3 = pd.merge(df1, df2, on='Ticker', how='outer', suffixes=('_1', '_2'))
-#             df3 = df3.fillna(0)
+            # Obtain the DataFrames for the two dates
+            df2 = holdings_by_group_dict[account][d2].reset_index().drop(columns='Effective Date')
+            df1 = holdings_by_group_dict[account][d1].reset_index().drop(columns='Effective Date')
+            df3 = pd.merge(df1, df2, on='Ticker', how='outer', suffixes=('_1', '_2'))
+            df3 = df3.fillna(0)
             
-#             # Subtract the two DataFrames
-#             q_diff = df3['Quantity_2'] - df3['Quantity_1']
-#             market_diff = df3['Market Value_2'] - df3['Market Value_1']
+            # Subtract the two DataFrames
+            q_diff = df3['Quantity_2'] - df3['Quantity_1']
+            market_diff = df3['Market Value_2'] - df3['Market Value_1']
 
-#             df3['Quantity Change'] = q_diff
-#             df3['Market Value Change'] = market_diff
+            df3['Quantity Change'] = q_diff
+            df3['Market Value Change'] = market_diff
 
-#             df_diff_dict[str(n)] = df3
+            df_diff_dict[str(n)] = df3
 
-#         holdings_changes_dict[account] = df_diff_dict
+        holdings_changes_dict[account] = df_diff_dict
         
-#     return holdings_changes_dict
+    return holdings_changes_dict
 
 def top_holdings_changes(holdings_changes_dict):
     

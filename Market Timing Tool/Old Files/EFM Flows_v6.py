@@ -37,6 +37,7 @@ data_path = "Data/"
 output_path = "Data/Output/"
 bbg_path = "Data/bbg_historical_holdings/dm_sectors/"
 crd_path = 'Data/crd_daily_holdings_new/'
+market_regime_path = 'Data/market_regime_invesco.csv'
 
 efm_dict = {'MOMG':'BlackRock US MF',
             'MOMN':'Dimensional US MF',
@@ -276,13 +277,28 @@ save_csv(sector_weights_df, output_path, 'holdings_by_sector')
 # Plot sector weight changes for each fund, save as .jpgs in output
 plot_sector_weights(sector_weights_df, efm_dict, output_path)
 
+#%% market regime plot
+
+market_regime = pd.read_csv(market_regime_path)
+market_regime['Date'] = pd.to_datetime(market_regime['Date'], format="%Y %B")
+market_regime.sort_values('Date', inplace=True)
+market_regime.set_index('Date', inplace=True)
+
+colors = {
+    'Recovery': 'lightgreen',
+    'Expansion': 'lightblue',
+    'Slowdown': 'plum',
+    'Contraction': 'pink'
+}
+plot_sector_weights_with_regimes(sector_weights_df, efm_dict, market_regime, colors, output_path)
+
 
 # ## 6. Tabulate Changes for selected windows
 
 # In[11]:
 
 
-change_windows = [1, 7, 30, 60]
+change_windows = [1, 7, 30, 60] # days from current
 df_changes_list = tabulate_changes_all(sector_weights_df, efm_dict, output_path, change_windows)
 
 

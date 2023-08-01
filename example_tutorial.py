@@ -27,7 +27,7 @@ import numpy as np
 
 header_line_number = 2  # Assuming the first line is 0
 
-with open('for yap.csv', 'r') as f:
+with open('Factor value at stock level - Constituents (1).csv', 'r') as f:
     lines = f.readlines()
     header = lines[header_line_number]
 
@@ -48,8 +48,8 @@ usr = "AHamid"
 pwd = "Khazanah2022$"
 cid = "w5m9mk5qau"
 
-file = os.path.join(os.path.dirname(os.getcwd()), 'Khazanah', 'for yap.csv')
-attributeName = 'qfl Earnings Yield'  # the name of your price attribute (should exist in B1/BPM)
+file = os.path.join(os.path.dirname(os.getcwd()), 'Khazanah', 'Factor value at stock level - Constituents (1).csv')
+# attributeName = 'qfl Earnings Yield'  # the name of your price attribute (should exist in B1/BPM)
 riskModel = 'GEMLTESG'  # risk model to validate assetIds
 
 
@@ -174,9 +174,11 @@ def doUpload(attributeName, column_index):
                 print(">> ", grp._ResultMsg, " ", grp._Detail1)
 #%%
 for i, element in enumerate(header_list[5:]):
+    if i < 16:
+        continue
     # Do something with element
     print(f"{i+5}th column name is : {qfl + element}")
-    doUpload(qfl + element, i)
+    doUpload(qfl + element, i+5)
 
     #%%
 
