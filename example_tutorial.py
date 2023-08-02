@@ -174,7 +174,7 @@ def doUpload(attributeName, column_index):
                 print(">> ", grp._ResultMsg, " ", grp._Detail1)
 #%%
 for i, element in enumerate(header_list[5:]):
-    if i < 16:
+    if i < 60:
         continue
     # Do something with element
     print(f"{i+5}th column name is : {qfl + element}")

@@ -55,24 +55,25 @@ efm_holdings_data
 df_list = []
     
 for filename in os.listdir(crd_path):
-    df = pd.read_csv(crd_path + filename)
-    
-    df['Effective Date'] = pd.to_datetime(df['Effective Date'])
-    df = df.sort_values(by='Effective Date')
-    
-    if filename == 'momp_si_20230605.csv':
-        df = df[df['Effective Date'] >= '2022-02-11']
+    if not filename.endswith(".zip"):
+        df = pd.read_csv(crd_path + filename)
         
-    elif filename == 'momu_si_20230605.csv':
-        df = df[df['Effective Date'] >= '2022-12-21']
+        df['Effective Date'] = pd.to_datetime(df['Effective Date'])
+        df = df.sort_values(by='Effective Date')
         
-    elif filename == 'momx_si_20230605.csv':
-        df = df[df['Effective Date'] >= '2022-12-30']
+        if filename == 'momp_si_20230605.csv':
+            df = df[df['Effective Date'] >= '2022-02-11']
+            
+        elif filename == 'momu_si_20230605.csv':
+            df = df[df['Effective Date'] >= '2022-12-21']
+            
+        elif filename == 'momx_si_20230605.csv':
+            df = df[df['Effective Date'] >= '2022-12-30']
+            
+        elif filename == 'momg_si_20230605.csv':
+            df = df[df['Effective Date'] >= '2021-12-01']
         
-    elif filename == 'momg_si_20230605.csv':
-        df = df[df['Effective Date'] >= '2021-12-01']
-    
-    df_list.append(df)
+        df_list.append(df)
 
 # "efm_holdings_data" will be a DataFrame (df) containing historical stock holdings of efms defined above, and will be saved as defined below as .csv
 efm_holdings_data = pd.concat(df_list).set_index('Effective Date')
@@ -99,8 +100,9 @@ bbg_df_list = []
 
 # Loop through all the Excel files in the folder
 for filename in os.listdir(bbg_path):
-    df = pd.read_excel(bbg_path + filename)
-    bbg_df_list.append(df)
+    if not filename.endswith(".zip"):
+        df = pd.read_excel(bbg_path + filename)
+        bbg_df_list.append(df)
 
 # "bbg_data" will contain historical stock holdings from bloomberg
 bbg_data = pd.concat(bbg_df_list)
