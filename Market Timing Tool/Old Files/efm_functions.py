@@ -17,6 +17,45 @@ def get_country(ticker):
     else:
         return 'Europe'
 
+def process_benchmark_files(file_path):
+    data = pd.read_excel(file_path)
+    data = data[data['Weight'].apply(lambda x: isinstance(x, (int, float)) or (isinstance(x, str) and x.replace('.', '', 1).isdigit()))]
+    data['Weight'] = pd.to_numeric(data['Weight'], errors='coerce')
+    grouped = data.groupby('GICS Sector\n')['Weight'].sum() / 100
+    return grouped
+
+def read_invesco_data_to_sectors(df, sector):
+    
+    df = df.drop(0)
+    # Prepare column names
+    col_names = ['ISIN', 'Total', 'Sector', 'Industry group']
+    for i in range(4, df.columns.size, 3):
+        date = df.columns[i]
+        col_names.extend([f'{date}_Weight', f'{date}_EndingPrice', f'{date}_Shares'])
+    df.columns = col_names
+    df['Sector'].replace("#N/A Invalid Security", "Null", inplace=True)
+
+    df_melted = df.melt(id_vars=['ISIN', 'Total', 'Sector', 'Industry group'], 
+                        var_name='Attribute', 
+                        value_name='Value')
+    df_melted[['Date', 'Attribute']] = df_melted['Attribute'].str.split('_', expand=True)
+    df_pivot = df_melted.pivot(index=['ISIN', 'Total', 'Sector', 'Industry group', 'Date'], 
+                               columns='Attribute', 
+                               values='Value').reset_index()
+    df_pivot['Weight'] = pd.to_numeric(df_pivot['Weight'])
+    df_sector_weights = df_pivot.groupby(['Date', sector])['Weight'].sum().reset_index()
+    df_sector_weights['Date'] = pd.to_datetime(df_sector_weights['Date'], format='%d-%b-%Y')
+    df_sector_weights.set_index('Date', inplace=True)
+    # df_sector_weights_pivot = df_sector_weights.pivot(index='Date', columns='Sector', values='Weight')
+    df_sector_weights.insert(0, "Account Code", "MOMP")
+    # df_sector_weights_pivot.index = pd.to_datetime(df_sector_weights_pivot.index, format='%d-%b-%Y')
+    # df_sector_weights_pivot = df_sector_weights_pivot.sort_index()
+    df_sector_weights = df_sector_weights.sort_index()
+    df_sector_weights["Weight"] = df_sector_weights["Weight"] / 100
+    df_sector_weights = df_sector_weights.rename(columns={'Weight' : f'{sector} Weight'})
+    return df_sector_weights
+    
+    
 def sector_weights(holdings):
     sector_weights_dict = {}
     for date, group in holdings.groupby(level=0):
@@ -100,7 +139,26 @@ def plot_sector_weights(sector_weights_df, efm_dict, output_path):
     
         # df_filtered_dict[account] = df_filtered
     # return df_filtered_dict
+def plot_active_sector_weights(sector_weights_df, output_path):
+    
+    df_filtered_dict = {}
+    df_fund_sectors_list = []
+    
+        
+    df_filtered = sector_weights_df
+    df_filtered.groupby('Sector')['Sector Weight'].plot(legend=True, figsize=(14, 6))
 
+    plt.title(f'Invesco Sector Active Weights over time')
+    plt.xlabel('Effective Date')
+    plt.ylabel('Sector Weight')
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3) 
+    
+    # save plot as a jpg image in output directory
+    plot_title = f'Sector_weights_over_time_for_active.jpg'
+    plt.savefig(os.path.join(output_path, plot_title), dpi=300, bbox_inches='tight')
+    plt.show()
+        
+        
 def plot_sector_weights_with_regimes(sector_weights_df, efm_dict, additional_df, colors, output_path):
     df_filtered_dict = {}
     
@@ -120,12 +178,42 @@ def plot_sector_weights_with_regimes(sector_weights_df, efm_dict, additional_df,
         plt.xlabel('Effective Date')
         plt.ylabel('Sector Weight')
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+        import matplotlib.patches as mpatches
+        patches = [mpatches.Patch(color=color, label=regime) for regime, color in colors.items()]
+        plt.legend(handles=patches, loc='upper center', bbox_to_anchor=(0.5, -0.3), ncol=2)
         
         # save plot as a jpg image in output directory
         plot_title = f'Sector_weights_over_time_for_{efm_dict[efm]}.jpg'
         plt.savefig(os.path.join(output_path, plot_title), dpi=300, bbox_inches='tight')
         plt.show()
 
+def plot_invesco_activeweights_with_regimes(sector_weights_df, additional_df, colors, output_path):
+    df_filtered_dict = {}
+    
+
+    df_filtered = sector_weights_df
+    # print(df_filtered)
+    # df_filtered['Effective Date'] = pd.to_datetime(df_filtered['Effective Date'])
+    # df_filtered.set_index('Effective Date', inplace=True)
+    df_filtered.groupby('Sector')['Sector Weight'].plot(legend=True, figsize=(14, 6))
+
+    for i in range(len(additional_df) - 1):
+        start = additional_df.index[i]
+        end = additional_df.index[i + 1]
+        plt.axvspan(start, end, color=colors[additional_df['Regime'].iloc[i]], alpha=0.5)
+
+    plt.title(f'Invesco Sector Active Weights over time')
+    plt.xlabel('Effective Date')
+    plt.ylabel('Sector Weight')
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+    import matplotlib.patches as mpatches
+    patches = [mpatches.Patch(color=color, label=regime) for regime, color in colors.items()]
+    plt.legend(handles=patches, loc='upper center', bbox_to_anchor=(0.5, -0.3), ncol=2)
+    
+    # save plot as a jpg image in output directory
+    plot_title = f'Sector_weights_over_time_for_active.jpg'
+    plt.savefig(os.path.join(output_path, plot_title), dpi=300, bbox_inches='tight')
+    plt.show()
 
 
 def plot_industry_group_weights(sector_weights_df, efm_dict, output_path):

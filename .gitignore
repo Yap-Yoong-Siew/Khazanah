@@ -4,3 +4,7 @@
 AutoML_*/
 *zip
 Market Timing Tool/Old Files/Data/Output/*
+factor_return/
+factor_6m_past_diff/
+factor_6m_future_diff/
+*log

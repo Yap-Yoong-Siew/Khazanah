@@ -22,12 +22,15 @@ import csv
 import os
 import pandas as pd
 import numpy as np
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('suds.transport').setLevel(logging.DEBUG)
 #%%
 
 
-header_line_number = 2  # Assuming the first line is 0
+header_line_number = 0  # Assuming the first line is 0
 
-with open('Factor value at stock level - Constituents (1).csv', 'r') as f:
+with open('test bdt 04082023.csv', 'r') as f:
     lines = f.readlines()
     header = lines[header_line_number]
 
@@ -41,6 +44,8 @@ qfl = "QFL "
 #logging.getLogger('suds.client').setLevel(logging.DEBUG)
 #logging.getLogger('suds.transport').setLevel(logging.DEBUG)
 
+
+
 url = "https://www.barraone.com/axis2/services/BDTService?wsdl"
 client = Client(url, location=url, timeout=50000)
 
@@ -48,8 +53,9 @@ usr = "AHamid"
 pwd = "Khazanah2022$"
 cid = "w5m9mk5qau"
 
-file = os.path.join(os.path.dirname(os.getcwd()), 'Khazanah', 'Factor value at stock level - Constituents (1).csv')
-# attributeName = 'qfl Earnings Yield'  # the name of your price attribute (should exist in B1/BPM)
+file = os.path.join(os.path.dirname(os.getcwd()), 'Khazanah', 'test bdt 04082023.csv')
+attributeName = 'QFL Midcap'  # the name of your price attribute (should exist in B1/BPM)
+column_index = 5
 riskModel = 'GEMLTESG'  # risk model to validate assetIds
 
 
@@ -84,13 +90,12 @@ def doUpload(attributeName, column_index):
     allAttList = []
     attValList = []
     with open(file) as rowdata:
-        next(rowdata)  # skip first line of headers
-        next(rowdata)  # skip first line of headers
-        next(rowdata)  # skip first line of headers
+        # next(rowdata)  # skip first line of headers
+        # next(rowdata)  # skip first line of headers
+        # next(rowdata)  # skip first line of headers
         hf_info=csv.reader(rowdata, delimiter=',')
 
         for row in hf_info:
-		
             date = row[2]
             asset = row[4]
             value = autoconvert(row[column_index])
@@ -126,6 +131,7 @@ def doUpload(attributeName, column_index):
         att1._Owner = usr
         try:
             att1._EffectiveStartDate = datetime.strptime(oldDate, '%m/%d/%Y') 
+
         except ValueError:
             print(f'Error processing date: {oldDate}')    
 		
@@ -133,7 +139,7 @@ def doUpload(attributeName, column_index):
         attValues.AttrValue = attValList
         att1.AttrValues = attValues				
         allAttList.append(att1)
-
+        
     jobId = client.service.SubmitImportJob(User=usr, Client=cid, Password=pwd, ModelName=riskModel, JobName="AttrUpload_"+attributeName, AssetAttribute=allAttList)
     print('Processing job:', jobId)
 	
@@ -172,63 +178,64 @@ def doUpload(attributeName, column_index):
             print(ejr._EffectiveDate, ", ", ejr._Name, ", ", ejr._Owner)
             for grp in ejr.Details.ImportLogDetail:
                 print(">> ", grp._ResultMsg, " ", grp._Detail1)
+    handler = logging.FileHandler('suds7.log')
+    logging.getLogger('suds.transport').addHandler(handler)
 #%%
 for i, element in enumerate(header_list[5:]):
-    if i < 60:
-        continue
     # Do something with element
-    print(f"{i+5}th column name is : {qfl + element}")
+    
     doUpload(qfl + element, i+5)
+    print(f"{i+5}th column name is : {qfl + element}")
 
     #%%
 
-import math
-import numpy as np 
-import pandas as pd
-import matplotlib.pyplot as plt
+# import math
+# import numpy as np 
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
 
-class DecisionTree():
+# class DecisionTree():
 
-    def __init__(self, X, y, min_samples_leaf=5, max_depth=6, idxs=None):
-        assert max_depth >= 0, 'max_depth must be nonnegative'
-        assert min_samples_leaf > 0, 'min_samples_leaf must be positive'
-        self.min_samples_leaf, self.max_depth = min_samples_leaf, max_depth
-        if isinstance(y, pd.Series): y = y.values
-        if idxs is None: idxs = np.arange(len(y))
-        self.X, self.y, self.idxs = X, y, idxs
-        self.n, self.c = len(idxs), X.shape[1]
-        self.value = y.mean()
-        self.best_score_so_far = float('inf')
+#     def __init__(self, X, y, min_samples_leaf=5, max_depth=6, idxs=None):
+#         assert max_depth >= 0, 'max_depth must be nonnegative'
+#         assert min_samples_leaf > 0, 'min_samples_leaf must be positive'
+#         self.min_samples_leaf, self.max_depth = min_samples_leaf, max_depth
+#         if isinstance(y, pd.Series): y = y.values
+#         if idxs is None: idxs = np.arange(len(y))
+#         self.X, self.y, self.idxs = X, y, idxs
+#         self.n, self.c = len(idxs), X.shape[1]
+#         self.value = y.mean()
+#         self.best_score_so_far = float('inf')
         
-        if self.max_depth > 0:
-            self._maybe_insert_child_nodes()
+#         if self.max_depth > 0:
+#             self._maybe_insert_child_nodes()
             
             
-    def _maybe_insert_child_nodes(self):
-        for j in range(self.c):
-            self._find_better_split(j)
-        if self.is_leaf: #do not insert children
-            return
-        x = self.X.values[self.idxs, self.split_feature_idx]
-        left_idx = np.nonzero(x <= self.threshold)[0]
-        right_idx = np.nonzero(x > self.threshold)[0]
-        self.left = DecisionTree(self.X, self.y, self.min_samples_leaf, self.max_depth - 1, self.idxs[left_idx])
-        self.right = DecisionTree(self.X, self.y, self.min_samples_leaf, self.max_depth - 1, self.idxs[right_idx])
+#     def _maybe_insert_child_nodes(self):
+#         for j in range(self.c):
+#             self._find_better_split(j)
+#         if self.is_leaf: #do not insert children
+#             return
+#         x = self.X.values[self.idxs, self.split_feature_idx]
+#         left_idx = np.nonzero(x <= self.threshold)[0]
+#         right_idx = np.nonzero(x > self.threshold)[0]
+#         self.left = DecisionTree(self.X, self.y, self.min_samples_leaf, self.max_depth - 1, self.idxs[left_idx])
+#         self.right = DecisionTree(self.X, self.y, self.min_samples_leaf, self.max_depth - 1, self.idxs[right_idx])
         
-    def _find_better_split(self, feature_idx):
-        pass
+#     def _find_better_split(self, feature_idx):
+#         pass
     
-    @property
-    def is_leaf(self):
-        return self.best_score_so_far == float('inf')
-#%%
-from sklearn.datasets import load_diabetes
-X, y = load_diabetes(as_frame=True, return_X_y=True)
+#     @property
+#     def is_leaf(self):
+#         return self.best_score_so_far == float('inf')
+# #%%
+# from sklearn.datasets import load_diabetes
+# X, y = load_diabetes(as_frame=True, return_X_y=True)
 
 
 
-t = DecisionTree(X, y, min_samples_leaf=5, max_depth=5)
+# t = DecisionTree(X, y, min_samples_leaf=5, max_depth=5)
 
 
 

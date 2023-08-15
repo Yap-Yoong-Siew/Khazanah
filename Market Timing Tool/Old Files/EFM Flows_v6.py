@@ -18,7 +18,7 @@ from efm_functions import *
 import os
 from copy import deepcopy
 from IPython.display import HTML
-
+from sklearn.metrics.pairwise import cosine_similarity
 get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
@@ -38,6 +38,11 @@ output_path = "Data/Output/"
 bbg_path = "Data/bbg_historical_holdings/dm_sectors/"
 crd_path = 'Data/crd_daily_holdings_new/'
 market_regime_path = 'Data/market_regime_invesco.csv'
+benchmark_path = 'Data/Benchmark Weights/MXUS/'
+
+
+
+#%%
 
 efm_dict = {'MOMG':'BlackRock US MF',
             'MOMN':'Dimensional US MF',
@@ -111,11 +116,6 @@ bbg_data = pd.concat(bbg_df_list)
 # save_csv(bbg_data, output_path, 'bbg_holdings_data')
 print('Files successfully imported.')
 
-
-# In[3]:
-
-
-efm_holdings_data
 
 
 # ## 3. Process Data
@@ -243,10 +243,8 @@ print(f'Funds: {fund_list} \n'
       f'{number_of_rows} rows')
 
 
-# In[5]:
 
-
-holdings.to_csv('holdings_industry_group.csv')
+# holdings.to_csv('holdings_industry_group.csv')
 
 
 # ## 4. Calculate and plot sector weights over time
@@ -257,10 +255,6 @@ holdings.to_csv('holdings_industry_group.csv')
 industry_weights_df = industry_group_weights(holdings)
 
 
-# In[7]:
-
-
-industry_weights_df
 
 
 # In[8]:
@@ -269,17 +263,55 @@ industry_weights_df
 plot_industry_group_weights(industry_weights_df, efm_dict, output_path)
 
 
-# In[10]:
+#%% process 2018 to 2021 data
+
+df = pd.read_excel("Data//Invesco OMFL_Month Ends.xlsx")
+
+df_sector_weights = read_invesco_data_to_sectors(df, "Sector")
+
+#%% process benchmark data 2021 to 2023
 
 
+data_list = []
+
+for subdirectories in os.listdir(benchmark_path):
+    year_path =  os.path.join(benchmark_path, subdirectories)
+    files_for_year = os.listdir(year_path)
+    
+    sector_weights_year = pd.Series(dtype=float)
+    for file in files_for_year:
+        file_path = os.path.join(year_path, file)
+        date_str = file.split(" as of ")[1].split(".xlsx")[0]
+        date_str = date_str[:-1]  # Remove the last character (extra "1")
+        # Convert to datetime object
+        try:
+            date_obj = pd.to_datetime(date_str)
+        except:
+            continue
+        # Process the file
+        sector_weights_series = process_benchmark_files(file_path)
+        for sector, weight in sector_weights_series.items():
+            data_list.append([date_obj, sector, weight])
+# Create a DataFrame with 'Date' as the index
+benchmark_df = pd.DataFrame(data_list, columns=['Date', 'Sector', 'Sector Weight'])
+benchmark_df.set_index('Date', inplace=True)
+benchmark_df['Sector'].replace('--', 'Null', inplace=True)
+benchmark_df.to_csv("benchmark_df.csv")
+
+
+
+
+#%%
 # Calculate sector weights for each day, save into .csv file in output
 sector_weights_df = sector_weights(holdings)
-save_csv(sector_weights_df, output_path, 'holdings_by_sector')
+sector_weights_df = pd.concat([df_sector_weights, sector_weights_df], axis=0)
+sector_weights_df.index.name = 'Date'
+# save_csv(sector_weights_df, output_path, 'holdings_by_sector')
 
 # Plot sector weight changes for each fund, save as .jpgs in output
 plot_sector_weights(sector_weights_df, efm_dict, output_path)
 
-#%% market regime plot
+#%% market regime plot without subtract benchmark
 
 market_regime = pd.read_csv(market_regime_path)
 market_regime['Date'] = pd.to_datetime(market_regime['Date'], format="%Y %B")
@@ -287,16 +319,159 @@ market_regime.sort_values('Date', inplace=True)
 market_regime.set_index('Date', inplace=True)
 
 colors = {
-    'Recovery': 'lightgreen',
-    'Expansion': 'lightblue',
+    'Recovery': 'lightblue',
+    'Expansion': 'lightgreen',
     'Slowdown': 'plum',
-    'Contraction': 'pink'
+    'Contraction': 'lightcoral'
 }
 plot_sector_weights_with_regimes(sector_weights_df, efm_dict, market_regime, colors, output_path)
 
+#%% market regime plot WITH subtract benchmark
+sector_weights_df = sector_weights_df[sector_weights_df['Account Code'] == 'MOMP']
 
-# ## 6. Tabulate Changes for selected windows
+sector_weights_df = sector_weights_df.drop(['Account Code'], axis=1)
+sector_weights_df.to_csv("invesco_sector_weights.csv")
+#%% create df for active weight
 
+df_invesco = pd.read_csv("invesco_sector_weights.csv", parse_dates=['Date'])
+df_invesco = df_invesco[552: 4758]
+df_benchmark = pd.read_csv("benchmark_df.csv", parse_dates=['Date'])
+df_active = df_invesco.copy()
+
+def subtract_weights(row):
+    matching_value = df_benchmark.loc[
+        (df_benchmark['Date'].dt.month == row['Date'].month) &
+        (df_benchmark['Date'].dt.year == row['Date'].year) &
+        (df_benchmark['Sector'] == row['Sector']), 
+        'Sector Weight'
+    ]
+    
+    if row['Sector'] == "Not Applicable":
+        return row['Sector Weight'] - 0
+    elif matching_value.size > 0:
+        return row['Sector Weight'] - matching_value.values[0]
+    else:
+        return row['Sector Weight']
+
+df_active['Sector Weight'] = df_invesco.apply(subtract_weights, axis=1)
+df_active.set_index('Date', inplace=True)
+sector_weights_df = df_active
+plot_active_sector_weights(sector_weights_df, output_path)
+plot_invesco_activeweights_with_regimes(sector_weights_df, market_regime, colors, output_path)
+
+#%%
+
+# # Filter sector_weights_df to match the date range of benchmark_df
+# sector_weights_df = sector_weights_df[sector_weights_df['Date'].isin(benchmark_df['Date'])]
+
+# # Merge the benchmark and invesco dataframes on Date and Sector
+# merged_df = pd.merge(sector_weights_df, benchmark_df, on=['Date', 'Sector'], how='left', suffixes=('_invesco', '_benchmark'))
+
+# # Calculate the difference between invesco and benchmark weights
+# merged_df['Active Weight'] = merged_df['Sector Weight_invesco'] - merged_df['Sector Weight_benchmark'].fillna(0)
+
+# # Extract the relevant columns to form the active_weights_df
+# active_weights_df = merged_df[['Date', 'Sector', 'Active Weight']]
+
+# active_weights_df.head()
+
+
+
+#%% PREPROCESSING FOR regime similarity score using cosines similarity
+
+def fill_missing_elements(row):
+    missing_elements = np.setdiff1d(np.arange(1, 14), row)
+    row = np.concatenate([row, missing_elements])
+    return row
+
+
+market_regime.index = pd.to_datetime(market_regime.index)
+
+# sector_regime_df = pd.merge_asof(sector_weights_df.sort_index(), market_regime.sort_index(), 
+#                             left_index=True, right_index=True, direction='backward') do this line later
+
+sector_weights_df = sector_weights_df.groupby(sector_weights_df.index).apply(lambda x: x.sort_values(by='Sector Weight', ascending=False))
+
+sector_mapping = {
+    'Utilities': 1,
+    'Null': 2,
+    'Communication Services': 3,
+    'Consumer Discretionary': 4,
+    'Consumer Staples': 5,
+    'Energy': 6,
+    'Financials': 7,
+    'Health Care': 8,
+    'Industrials': 9,
+    'Materials': 10,
+    'Information Technology': 11,
+    'Real Estate': 12,
+    'Not Classified' : 13
+}
+
+sector_weights_df['Sector'] = pd.Categorical(sector_weights_df['Sector'], categories=sector_mapping.keys()).codes + 1
+sector_weights_df = sector_weights_df.groupby(level=0)['Sector'].apply(lambda x: x.to_numpy())
+sector_weights_df = pd.merge_asof(sector_weights_df.sort_index(), market_regime.sort_index(), 
+                            left_index=True, right_index=True, direction='backward')
+sector_weights_df['Sector'] = sector_weights_df['Sector'].apply(fill_missing_elements)
+
+#%% IMPLEMENTATION FOR regime similarity score using cosines similarity 
+
+
+# Define the cosine similarity calculator function
+def cosine_similarity_calculator(input_vector, dataframe, n):
+    # Ensure the input_vector is a numpy array
+    input_vector = np.array(input_vector)
+    
+    # Group vectors by regime
+    grouped = dataframe.groupby('Regime')
+    
+    # For each regime
+    similarities = {}
+    for name, group in grouped:
+        sliced_input_vector = input_vector[:n]
+        sliced_group = group['Sector'].apply(lambda x: x[:n])
+        # Calculate cosine similarity between input vector and each vector in the group
+        group_similarities = sliced_group.apply(lambda x: cosine_similarity([sliced_input_vector], [x])[0,0])
+        # Compute average cosine similarity for the group
+        avg_similarity = group_similarities.mean()
+        similarities[name] = avg_similarity
+
+    # Return the regime with the highest average cosine similarity
+    predicted_regime = max(similarities, key=similarities.get)
+    return predicted_regime, similarities
+
+sector_weights_df['Sector'] = sector_weights_df['Sector'].apply(np.array)
+n=13
+recovery_vector = [ 7, 10,  9,  4, 13,  1, 12 , 6,  5 , 3 , 8 ,11,  2]
+
+predicted_regime, similarities = cosine_similarity_calculator(recovery_vector, sector_weights_df, n)
+print("testing for recovery")
+
+print(predicted_regime)
+print(similarities)
+
+expansion_vector = [ 7, 10,  2,  9, 12,  4 , 6 , 1, 13 , 5,  3,  8, 11]
+
+predicted_regime, similarities = cosine_similarity_calculator(expansion_vector, sector_weights_df, n)
+print("testing for expansion")
+
+print(predicted_regime)
+print(similarities)
+
+slowdown_vector = [ 8 , 5 , 7,  6,  2, 13,  4 , 9 , 3 ,12, 10 , 1 ,11]
+
+predicted_regime, similarities = cosine_similarity_calculator(slowdown_vector, sector_weights_df, n)
+print("testing for slowdown")
+
+print(predicted_regime)
+print(similarities)
+
+contraction_vector = [ 8,  6,  5 , 7, 13, 10 , 1 , 9 ,12 , 4,  3, 11 , 2]
+contraction_vector = [ 8,  6,  5 , 2, 1,  13, 12, 10,  3 , 9 , 7 , 4 ,11]
+predicted_regime, similarities = cosine_similarity_calculator(contraction_vector, sector_weights_df, n)
+print("testing for contraction")
+print(predicted_regime)
+print(similarities)
 # In[11]:
 
 
@@ -326,7 +501,7 @@ change_windows = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 
 holdings_changes_dict = stock_changes(holdings, change_windows)
 holdings_changes_df = stock_changes_df(holdings_changes_dict, efm_dict)
-holdings_changes_df.to_csv('holdings_changes_df_6.csv')
+holdings_changes_df.to_csv('holdings_changes_df.csv')
 
 
 # In[ ]:

@@ -214,7 +214,7 @@ for col in df_concat.columns:
 
 #%% positive training preprocessing
 
-up_percentage_threshold = 3
+up_percentage_threshold = 5
 
 df_concat['target'] = np.where(df_concat['perct_change'] > up_percentage_threshold, 1, 0)
 
